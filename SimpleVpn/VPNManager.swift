@@ -16,7 +16,7 @@ final class VPNManager: NSObject {
         instance.loadProfile(callback: nil)
         return instance
     }()
-    
+
     let manager: NEVPNManager = { NEVPNManager.shared() }()
     public var isDisconnected: Bool {
         get {
@@ -36,6 +36,7 @@ final class VPNManager: NSObject {
             name: NSNotification.Name.NEVPNStatusDidChange,
             object: nil)
     }
+    
     public func disconnect(completionHandler: (()->Void)? = nil) {
         manager.onDemandRules = []
         manager.isOnDemandEnabled = false
@@ -48,6 +49,7 @@ final class VPNManager: NSObject {
     @objc private func VPNStatusDidChange(_: NSNotification?){
         statusEvent.notify(status)
     }
+    
     private func loadProfile(callback: ((Bool)->Void)?) {
         manager.protocolConfiguration = nil
         manager.loadFromPreferences { error in
@@ -59,6 +61,7 @@ final class VPNManager: NSObject {
             }
         }
     }
+    
     private func saveProfile(callback: ((Bool)->Void)?) {
         manager.saveToPreferences { error in
             if let error = error {
@@ -69,6 +72,7 @@ final class VPNManager: NSObject {
             }
         }
     }
+    
     public func connectIKEv2(config: Configuration, onError: @escaping (String)->Void) {
         let p = NEVPNProtocolIKEv2()
         if config.pskEnabled {
@@ -78,24 +82,30 @@ final class VPNManager: NSObject {
         }
         p.serverAddress = config.server
         p.disconnectOnSleep = false
-        p.deadPeerDetectionRate = NEVPNIKEv2DeadPeerDetectionRate.medium
         p.username = config.account
         p.passwordReference = config.getPasswordRef()
         p.sharedSecretReference = config.getPSKRef()
-        p.disableMOBIKE = false
-        p.disableRedirect = false
-        p.enableRevocationCheck = false
-        p.enablePFS = false
         p.useExtendedAuthentication = true
-        p.useConfigurationAttributeInternalIPSubnet = false
+        p.deadPeerDetectionRate = .low
+        p.disableMOBIKE = true
+        
+        // Мб не так понял смысл этого rule, надо почекать что вообще происходить будет по такой схеме
+        if config.isDNSEnabled, let dns1 = config.firstDNSEndpoint, let dns2 = config.secondDNSEndpoint {
+            let evaluationRule = NEEvaluateConnectionRule(matchDomains: Domains.tlds,
+                                                          andAction: NEEvaluateConnectionRuleAction.connectIfNeeded)
+            evaluationRule.useDNSServers = [dns1, dns2]
+            let onDemandRule = NEOnDemandRuleEvaluateConnection()
+            onDemandRule.connectionRules = [evaluationRule]
+            onDemandRule.interfaceTypeMatch = NEOnDemandRuleInterfaceType.any
+            manager.onDemandRules = [onDemandRule, NEOnDemandRuleConnect()]
+        }
         
         // two lines bellow may depend of your server configuration
         p.remoteIdentifier = config.server
         p.localIdentifier = config.account
-        
         loadProfile { _ in
             self.manager.protocolConfiguration = p
-            if config.onDemand {
+            if config.onDemand && config.isDNSEnabled == false {
                 self.manager.onDemandRules = [NEOnDemandRuleConnect()]
                 self.manager.isOnDemandEnabled = true
             }

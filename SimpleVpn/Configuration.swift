@@ -18,6 +18,9 @@ class Configuration {
     static let KEYCHAIN_PASSWORD_KEY = "KEYCHAIN_PASSWORD_KEY"
     static let KEYCHAIN_PSK_KEY = "KEYCHAIN_PSK_KEY"
     
+    static let FIRST_DNS_KEY = "FIRST_DNS_KEY"
+    static let SECOND_DNS_KEY = "SECOND_DNS_KEY"
+    
     public let server: String
     public let account: String
     public let password: String
@@ -26,19 +29,28 @@ class Configuration {
     public var pskEnabled: Bool {
         return psk != nil
     }
+    public let firstDNSEndpoint: String?
+    public let secondDNSEndpoint: String?
+    public var isDNSEnabled: Bool {
+        return firstDNSEndpoint != nil && secondDNSEndpoint != nil
+    }
     
-    init(server: String, account: String, password: String, onDemand: Bool = false, psk: String? = nil) {
+    init(server: String, account: String, password: String, onDemand: Bool = false, psk: String? = nil,
+         firstDNSEndpoint: String? = nil, secondDNSEndpoint: String? = nil) {
         self.server = server
         self.account = account
         self.password = password
         self.onDemand = onDemand
         self.psk = psk
+        self.firstDNSEndpoint = firstDNSEndpoint
+        self.secondDNSEndpoint = secondDNSEndpoint
     }
     
     func getPasswordRef() -> Data? {
         KeychainWrapper.standard.set(password, forKey: Configuration.KEYCHAIN_PASSWORD_KEY)
         return KeychainWrapper.standard.dataRef(forKey: Configuration.KEYCHAIN_PASSWORD_KEY)
     }
+    
     func getPSKRef() -> Data? {
         if psk == nil { return nil }
         
@@ -53,14 +65,19 @@ class Configuration {
         let password = def.string(forKey: Configuration.PASSWORD_KEY) ?? ""
         let onDemand = def.bool(forKey: Configuration.ONDEMAND_KEY)
         let psk = def.string(forKey: Configuration.PSK_KEY)
+        let firstDNS = def.string(forKey: Configuration.FIRST_DNS_KEY)
+        let secondDNS = def.string(forKey: Configuration.SECOND_DNS_KEY)
         return Configuration(
             server: server,
             account: account,
             password: password,
             onDemand: onDemand,
-            psk: psk
+            psk: psk,
+            firstDNSEndpoint: firstDNS,
+            secondDNSEndpoint: secondDNS
         )
     }
+    
     func saveToDefaults() {
         let def = UserDefaults.standard
         def.set(server, forKey: Configuration.SERVER_KEY)
@@ -68,5 +85,7 @@ class Configuration {
         def.set(password, forKey: Configuration.PASSWORD_KEY)
         def.set(onDemand, forKey: Configuration.ONDEMAND_KEY)
         def.set(psk, forKey: Configuration.PSK_KEY)
+        def.set(firstDNSEndpoint, forKey: Configuration.FIRST_DNS_KEY)
+        def.set(secondDNSEndpoint, forKey: Configuration.SECOND_DNS_KEY)
     }
 }
